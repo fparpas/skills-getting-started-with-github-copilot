@@ -4,6 +4,32 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
+  // Add delete button functionality
+  function addDeleteButtons(participantsList, activityName) {
+    participantsList.querySelectorAll("li").forEach((li) => {
+      const deleteButton = document.createElement("button");
+      deleteButton.textContent = "❌";
+      deleteButton.className = "delete-button";
+      deleteButton.addEventListener("click", async () => {
+        try {
+          const email = li.textContent;
+          const response = await fetch(`/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`, {
+            method: "DELETE",
+          });
+
+          if (response.ok) {
+            li.remove();
+          } else {
+            console.error("Failed to unregister participant");
+          }
+        } catch (error) {
+          console.error("Error unregistering participant:", error);
+        }
+      });
+      li.appendChild(deleteButton);
+    });
+  }
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
@@ -31,6 +57,9 @@ document.addEventListener("DOMContentLoaded", () => {
           </ul>
         `;
 
+        const participantsList = activityCard.querySelector("ul");
+        addDeleteButtons(participantsList, name);
+
         activitiesList.appendChild(activityCard);
 
         // Add option to select dropdown
@@ -42,6 +71,26 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
       console.error("Error fetching activities:", error);
+    }
+  }
+
+  // Function to refresh participants list dynamically
+  async function refreshParticipants(activityName) {
+    try {
+      const response = await fetch(`/activities`);
+      const activities = await response.json();
+
+      const activityDetails = activities[activityName];
+      const participantsList = document.querySelector(`.activity-card h4:contains('${activityName}')`).nextElementSibling.nextElementSibling;
+
+      if (participantsList) {
+        participantsList.innerHTML = activityDetails.participants
+          .map((participant) => `<li>${participant}</li>`)
+          .join("");
+        addDeleteButtons(participantsList, activityName);
+      }
+    } catch (error) {
+      console.error("Error refreshing participants:", error);
     }
   }
 
@@ -66,6 +115,9 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+
+        // Refresh participants list dynamically
+        refreshParticipants(activity);
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
